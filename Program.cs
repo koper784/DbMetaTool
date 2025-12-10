@@ -1,6 +1,4 @@
-﻿using System;
-using System.IO;
-using System.Text;
+﻿using System.Text;
 using FirebirdSql.Data.FirebirdClient;
 using FirebirdSql.Data.Isql;
 
@@ -233,15 +231,6 @@ namespace DbMetaTool
             }
         }
 
-        private static void ExecuteScript(FbConnection connection, string scriptContent)
-        {
-            if (string.IsNullOrWhiteSpace(scriptContent))
-                return;
-
-            using var cmd = new FbCommand(scriptContent, connection);
-            cmd.ExecuteNonQuery();
-        }
-
         private static void ExecuteScriptWithTerminator(FbConnection connection, string scriptContent)
         {
             if (string.IsNullOrWhiteSpace(scriptContent))
@@ -387,7 +376,7 @@ namespace DbMetaTool
                         try
                         {
                             var scriptContent = File.ReadAllText(scriptFile);
-                            ExecuteScriptWithTransaction(connection, scriptContent);
+                            ExecuteScript(connection, scriptContent);
                             domainsExecuted++;
                             Console.WriteLine($"Wykonano: {Path.GetFileName(scriptFile)}");
                         }
@@ -426,7 +415,7 @@ namespace DbMetaTool
                         try
                         {
                             var scriptContent = File.ReadAllText(scriptFile);
-                            ExecuteScriptWithTransaction(connection, scriptContent);
+                            ExecuteScript(connection, scriptContent);
                             tablesExecuted++;
                             Console.WriteLine($"Wykonano: {Path.GetFileName(scriptFile)}");
                         }
@@ -465,7 +454,7 @@ namespace DbMetaTool
                         try
                         {
                             var scriptContent = File.ReadAllText(scriptFile);
-                            ExecuteScriptWithTransactionAndTerminator(connection, scriptContent);
+                            ExecuteScriptWithTerminator(connection, scriptContent);
                             proceduresExecuted++;
                             Console.WriteLine($"Wykonano: {Path.GetFileName(scriptFile)}");
                         }
@@ -505,7 +494,7 @@ namespace DbMetaTool
             }
         }
 
-        private static void ExecuteScriptWithTransaction(FbConnection connection, string scriptContent)
+        private static void ExecuteScript(FbConnection connection, string scriptContent)
         {
             if (string.IsNullOrWhiteSpace(scriptContent))
                 return;
@@ -515,32 +504,6 @@ namespace DbMetaTool
             {
                 using var cmd = new FbCommand(scriptContent, connection, transaction);
                 cmd.ExecuteNonQuery();
-                transaction.Commit();
-            }
-            catch
-            {
-                transaction.Rollback();
-                throw;
-            }
-        }
-
-        private static void ExecuteScriptWithTransactionAndTerminator(FbConnection connection, string scriptContent)
-        {
-            if (string.IsNullOrWhiteSpace(scriptContent))
-                return;
-
-            // Use FbScript to handle SET TERM statements properly
-            var script = new FbScript(scriptContent);
-            script.Parse();
-
-            using var transaction = connection.BeginTransaction();
-            try
-            {
-                foreach (var statement in script.Results)
-                {
-                    var cmd = new FbCommand(statement.Text, connection, transaction);
-                    cmd.ExecuteNonQuery();
-                }
                 transaction.Commit();
             }
             catch
@@ -623,7 +586,7 @@ namespace DbMetaTool
             using var cmd = new FbCommand(tablesQuery, connection);
             using var reader = cmd.ExecuteReader();
 
-            var tableNames = new System.Collections.Generic.List<string>();
+            var tableNames = new List<string>();
             while (reader.Read())
             {
                 tableNames.Add(reader.GetString(0));
@@ -655,7 +618,7 @@ namespace DbMetaTool
                 colCmd.Parameters.AddWithValue("@TableName", tableName);
                 using var colReader = colCmd.ExecuteReader();
 
-                var columnDefs = new System.Collections.Generic.List<string>();
+                var columnDefs = new List<string>();
                 while (colReader.Read())
                 {
                     var columnName = colReader.GetString(0);
@@ -759,7 +722,7 @@ namespace DbMetaTool
             Console.WriteLine($"Wyeksportowano {count} procedur.");
         }
 
-        private static System.Collections.Generic.List<string> GetProcedureParameters(FbConnection connection, string procedureName, short parameterType)
+        private static List<string> GetProcedureParameters(FbConnection connection, string procedureName, short parameterType)
         {
             const string query = @"
                 SELECT
